@@ -1,0 +1,121 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Xcitways Simplified</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <style>
+    body {
+      background-color: #181d2c;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .board {
+      display: grid;
+      grid-template-columns: repeat(3, 100px);
+      grid-template-rows: repeat(3, 100px);
+      gap: 3px;
+    }
+
+    .cell {
+      width: 100px;
+      height: 100px;
+      background: black;
+      border: 2px solid #999;
+      position: relative;
+    }
+
+    .piece {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      border: 2px solid white;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="board" id="board"></div>
+
+  <script>
+    const board = document.getElementById('board');
+    const size = 3;
+    const boardState = [];
+    const pieces = [
+      { id: 'A1', color: 'red', pos: [2, 1] },
+      { id: 'A2', color: 'orange', pos: [2, 1] },
+      { id: 'B1', color: 'yellow', pos: [1, 0] },
+      { id: 'B2', color: 'green', pos: [1, 0] },
+      { id: 'C1', color: 'white', pos: [1, 2] },
+      { id: 'C2', color: 'lavender', pos: [1, 2] },
+      { id: 'D1', color: 'darkblue', pos: [0, 1] },
+      { id: 'D2', color: 'lightblue', pos: [0, 1] },
+    ];
+
+    for (let row = 0; row < size; row++) {
+      boardState[row] = [];
+      for (let col = 0; col < size; col++) {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.dataset.row = row;
+        cell.dataset.col = col;
+        board.appendChild(cell);
+        boardState[row][col] = [];
+      }
+    }
+
+    let selected = null;
+
+    function renderPieces() {
+      document.querySelectorAll('.piece').forEach(p => p.remove());
+      pieces.forEach(piece => {
+        const [row, col] = piece.pos;
+        const cell = document.querySelector(`.cell[data-row="${row}"][data-col="${col}"]`);
+        const div = document.createElement('div');
+        div.className = 'piece';
+        div.style.backgroundColor = piece.color;
+        div.dataset.id = piece.id;
+        div.onclick = () => selectPiece(piece);
+        cell.appendChild(div);
+      });
+    }
+
+    function selectPiece(piece) {
+      selected = piece;
+    }
+
+    function getAdjacentCells([r, c]) {
+      return [
+        [r - 1, c - 1], [r - 1, c], [r - 1, c + 1],
+        [r,     c - 1],             [r,     c + 1],
+        [r + 1, c - 1], [r + 1, c], [r + 1, c + 1]
+      ].filter(([x, y]) => x >= 0 && y >= 0 && x < size && y < size);
+    }
+
+    board.addEventListener('click', e => {
+      if (!selected || !e.target.classList.contains('cell')) return;
+      const row = +e.target.dataset.row;
+      const col = +e.target.dataset.col;
+      const isAdjacent = getAdjacentCells(selected.pos).some(([x, y]) => x === row && y === col);
+      const occupied = pieces.some(p => p.pos[0] === row && p.pos[1] === col);
+      if (isAdjacent && !occupied) {
+        selected.pos = [row, col];
+        selected = null;
+        renderPieces();
+      }
+    });
+
+    renderPieces();
+  </script>
+</body>
+</html>
