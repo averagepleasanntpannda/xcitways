@@ -2,130 +2,94 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Xcitways Minimal</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Xcitways Complete Game</title>
   <style>
-    body {
-      background: #181d2c;
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .board { display: grid; grid-template: repeat(3, 80px) / repeat(3, 80px); gap: 4px; }
-    .cell { background: #000; border: 2px solid #888; display: grid; grid-template: repeat(2, 1fr) / repeat(2, 1fr); position: relative;}
-    .corner { display: block; grid-template: none; }
-    .color-tile { width: 100%; height: 100%; }
-    .piece {
-      width: 28px; height: 28px; border-radius: 50%; margin: auto;
-      border: 2px solid #fff; cursor: pointer; box-sizing: border-box;
-    }
-    .selected { outline: 3px solid yellow; }
-    .can-move { outline: 2px dashed #0ff; }
+    body { background: #181d2c; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+    .board { display: grid; grid-template: repeat(3, 100px) / repeat(3, 100px); gap: 5px; }
+    .cell { background: black; border: 2px solid #888; display: grid; grid-template: repeat(2,1fr)/repeat(2,1fr); }
+    .corner { background: linear-gradient(to right,var(--c1) 50%,var(--c2) 50%); display: block; }
+    .piece { width: 30px; height: 30px; border-radius: 50%; border: 2px solid white; cursor: pointer; }
+    .highlight { outline: 2px solid yellow; }
   </style>
 </head>
 <body>
 <div class="board" id="board"></div>
 
 <script>
-const COLORS = [
-  ['red', 'orange'],           // Top-left corner
-  ['gold', 'forestgreen'],     // Top-right
-  ['ivory', 'lavender'],       // Bottom-left
-  ['darkblue', 'lightblue']    // Bottom-right
+const corners = [["red","orange"],["gold","darkgreen"],["ivory","lavender"],["darkblue","lightblue"]];
+let turn = 0;
+let selectedPiece = null;
+
+const pieces = [
+  {p:0, c:"red",pos:[2,1,1,1]}, {p:0, c:"orange",pos:[2,1,1,0]},
+  {p:1, c:"gold",pos:[1,0,1,1]}, {p:1, c:"darkgreen",pos:[1,0,1,0]},
+  {p:2, c:"ivory",pos:[1,2,1,1]}, {p:2, c:"lavender",pos:[1,2,1,0]},
+  {p:3, c:"darkblue",pos:[0,1,0,1]}, {p:3, c:"lightblue",pos:[0,1,0,0]},
 ];
 
-// Board: [row][col] = type ('corner' | 'quartered' | 'center')
-const BOARD_TYPE = [
-  ['corner',   'quartered',  'corner'],
-  ['quartered','center',     'quartered'],
-  ['corner',   'quartered',  'corner']
-];
-
-// Pieces are initialized away from their home (the opposite side)
-const PIECES = [
-  // Player 0: red, orange (goal at 0,0)
-  {owner:0, color:"red", cell:[2,1], sub:[0,0]},
-  {owner:0, color:"orange", cell:[2,1], sub:[0,1]},
-  // Player 1: gold, forestgreen (goal at 0,2)
-  {owner:1, color:"gold", cell:[1,0], sub:[1,0]},
-  {owner:1, color:"forestgreen", cell:[1,0], sub:[1,1]},
-  // Player 2: ivory, lavender (goal at 2,0)
-  {owner:2, color:"ivory", cell:[1,2], sub:[1,0]},
-  {owner:2, color:"lavender", cell:[1,2], sub:[1,1]},
-  // Player 3: darkblue, lightblue (goal at 2,2)
-  {owner:3, color:"darkblue", cell:[0,1], sub:[0,0]},
-  {owner:3, color:"lightblue", cell:[0,1], sub:[0,1]},
-];
-
-let selected = null;
-let turn = 0; // Which player's turn (0-3)
-
-function drawBoard() {
-  const board = document.getElementById('board');
-  board.innerHTML = '';
-  for(let r=0; r<3; r++) for(let c=0; c<3; c++) {
-    const type = BOARD_TYPE[r][c];
-    let cellDiv = document.createElement('div');
-    cellDiv.className = 'cell' + (type==='corner' ? ' corner' : '');
-    // Draw colored corners
-    if(type==='corner') {
-      const colorA = COLORS[(r===0?0:2)+(c===0?0:1)][0];
-      const colorB = COLORS[(r===0?0:2)+(c===0?0:1)][1];
-      cellDiv.innerHTML = `
-        <div class="color-tile" style="background:linear-gradient(to right,${colorA} 50%,${colorB} 50%)"></div>
-      `;
-      board.appendChild(cellDiv);
-      continue;
+function drawBoard(){
+  const b=document.getElementById('board'); b.innerHTML='';
+  for(let r=0;r<3;r++)for(let c=0;c<3;c++){
+    const cell=document.createElement('div'); cell.className='cell';
+    if(r!==1&&c!==1){
+      cell.className='corner';
+      let clr=corners[(r===0?0:2)+(c===0?0:1)];
+      cell.style.setProperty('--c1',clr[0]); cell.style.setProperty('--c2',clr[1]);
+    } else cell.onclick=()=>movePiece(r,c);
+    for(let sr=0;sr<2;sr++)for(let sc=0;sc<2;sc++){
+      const sub=document.createElement('div');
+      pieces.forEach(p=>{
+        if(p.pos.join()===[r,c,sr,sc].join()){
+          const pc=document.createElement('div'); pc.className='piece'; pc.style.background=p.c;
+          if(turn===p.p)pc.onclick=(e)=>{e.stopPropagation();selectPiece(p)};
+          sub.appendChild(pc);
+        }
+      });
+      cell.appendChild(sub);
     }
-    // For quartered/center: create 2x2 subcells
-    for(let sr=0; sr<2; sr++) for(let sc=0; sc<2; sc++) {
-      let subcell = document.createElement('div');
-      subcell.className = 'subcell';
-      subcell.dataset.row = r; subcell.dataset.col = c;
-      subcell.dataset.sr = sr; subcell.dataset.sc = sc;
-      // Find piece
-      const piece = PIECES.find(p=>p.cell[0]===r && p.cell[1]===c && p.sub[0]===sr && p.sub[1]===sc);
-      if(piece) {
-        let pc = document.createElement('div');
-        pc.className = 'piece'+((selected===piece)?' selected':'');
-        pc.style.background = piece.color;
-        pc.onclick = e => { e.stopPropagation(); selectPiece(piece); };
-        subcell.appendChild(pc);
-      }
-      // Highlight possible move
-      if(selected && canMoveTo(selected, [r,c,sr,sc])) subcell.classList.add('can-move');
-      subcell.onclick = ()=>tryMove([r,c,sr,sc]);
-      cellDiv.appendChild(subcell);
-    }
-    board.appendChild(cellDiv);
+    b.appendChild(cell);
   }
 }
 
-function selectPiece(piece) {
-  if(piece.owner !== turn) return; // Only active player's pieces can be selected
-  selected = piece;
-  drawBoard();
+function selectPiece(p){ selectedPiece=p; drawBoard(); }
+
+function movePiece(r,c){
+  if(!selectedPiece)return;
+  let [pr,pc]=selectedPiece.pos;
+  if(Math.abs(pr-r)>1||Math.abs(pc-c)>1)return;
+  for(let sr=0;sr<2;sr++)for(let sc=0;sc<2;sc++){
+    if(!pieces.some(pi=>pi.pos.join()===[r,c,sr,sc].join())){
+      selectedPiece.pos=[r,c,sr,sc];
+      checkWin();
+      turn=(turn+1)%4;
+      selectedPiece=null;
+      if(turn!==0)aiMove();
+      drawBoard();
+      return;
+    }
+  }
 }
 
-function canMoveTo(piece, dest) {
-  // No move if destination occupied
-  if(PIECES.some(p=>p.cell[0]===dest[0]&&p.cell[1]===dest[1]&&p.sub[0]===dest[2]&&p.sub[1]===dest[3]))
-    return false;
-  // Only allow moves to adjacent subcells (including across main cells)
-  const [r,c,sr,sc] = [...piece.cell, ...piece.sub];
-  const [dr,dc,dsr,dsc] = dest;
-  return (Math.abs(r*2+sr - dr*2-dsr)<=1) && (Math.abs(c*2+sc - dc*2-dsc)<=1) && !(r===dr&&c===dc&&sr===dsr&&sc===dsc);
+function aiMove(){
+  let aiPieces=pieces.filter(p=>p.p===turn);
+  aiPieces.some(ap=>{
+    let [tr,tc]=[[0,0],[0,2],[2,0],[2,2]][turn];
+    let [cr,cc]=ap.pos;
+    let dr=Math.sign(tr-cr),dc=Math.sign(tc-cc);
+    if(dr||dc){
+      movePiece(cr+dr,cc+dc);
+      return true;
+    }
+  });
 }
 
-function tryMove(dest) {
-  if(selected && canMoveTo(selected, dest)) {
-    selected.cell = [dest[0], dest[1]];
-    selected.sub = [dest[2], dest[3]];
-    selected = null;
-    // Next turn
-    turn = (turn+1)%4;
-    drawBoard();
+function checkWin(){
+  for(let i=0;i<4;i++){
+    let goal=[[0,0],[0,2],[2,0],[2,2]][i];
+    let playerPieces=pieces.filter(p=>p.p===i);
+    if(playerPieces.every(p=>p.pos[0]===goal[0]&&p.pos[1]===goal[1])){
+      setTimeout(()=>alert(`Player ${i+1} wins!`),10);
+    }
   }
 }
 
