@@ -2,12 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Xcitways Complete Game</title>
+  <title>Xcitways - Final Rules Version</title>
   <style>
-    body { background: #181d2c; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+    body { background: #222; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
     .board { display: grid; grid-template: repeat(3, 100px) / repeat(3, 100px); gap: 5px; }
-    .cell { background: black; border: 2px solid #888; display: grid; grid-template: repeat(2,1fr)/repeat(2,1fr); }
-    .corner { background: linear-gradient(to right,var(--c1) 50%,var(--c2) 50%); display: block; }
+    .cell { background: black; border: 2px solid #777; display: grid; grid-template: repeat(2,1fr)/repeat(2,1fr); }
+    .corner { background: linear-gradient(to right,var(--c1) 50%,var(--c2) 50%); }
     .piece { width: 30px; height: 30px; border-radius: 50%; border: 2px solid white; cursor: pointer; }
     .highlight { outline: 2px solid yellow; }
   </style>
@@ -16,24 +16,22 @@
 <div class="board" id="board"></div>
 
 <script>
-const corners = [["red","orange"],["gold","darkgreen"],["ivory","lavender"],["darkblue","lightblue"]];
-let turn = 0;
-let selectedPiece = null;
-
+const cornerColors = [["red","orange"],["gold","green"],["white","lavender"],["darkblue","lightblue"]];
+let turn = 0, selectedPiece = null;
 const pieces = [
-  {p:0, c:"red",pos:[2,1,1,1]}, {p:0, c:"orange",pos:[2,1,1,0]},
-  {p:1, c:"gold",pos:[1,0,1,1]}, {p:1, c:"darkgreen",pos:[1,0,1,0]},
-  {p:2, c:"ivory",pos:[1,2,1,1]}, {p:2, c:"lavender",pos:[1,2,1,0]},
-  {p:3, c:"darkblue",pos:[0,1,0,1]}, {p:3, c:"lightblue",pos:[0,1,0,0]},
+  {p:0,c:"red",pos:[2,1,1,1]}, {p:0,c:"orange",pos:[2,1,1,0]}, {p:0,c:"red",pos:[2,1,0,1]}, {p:0,c:"orange",pos:[2,1,0,0]},
+  {p:1,c:"gold",pos:[1,0,1,1]}, {p:1,c:"green",pos:[1,0,1,0]}, {p:1,c:"gold",pos:[1,0,0,1]}, {p:1,c:"green",pos:[1,0,0,0]},
+  {p:2,c:"white",pos:[1,2,1,1]}, {p:2,c:"lavender",pos:[1,2,1,0]}, {p:2,c:"white",pos:[1,2,0,1]}, {p:2,c:"lavender",pos:[1,2,0,0]},
+  {p:3,c:"darkblue",pos:[0,1,1,1]}, {p:3,c:"lightblue",pos:[0,1,1,0]}, {p:3,c:"darkblue",pos:[0,1,0,1]}, {p:3,c:"lightblue",pos:[0,1,0,0]},
 ];
 
 function drawBoard(){
-  const b=document.getElementById('board'); b.innerHTML='';
+  const board=document.getElementById('board'); board.innerHTML='';
   for(let r=0;r<3;r++)for(let c=0;c<3;c++){
     const cell=document.createElement('div'); cell.className='cell';
     if(r!==1&&c!==1){
       cell.className='corner';
-      let clr=corners[(r===0?0:2)+(c===0?0:1)];
+      let clr=cornerColors[(r===0?0:2)+(c===0?0:1)];
       cell.style.setProperty('--c1',clr[0]); cell.style.setProperty('--c2',clr[1]);
     } else cell.onclick=()=>movePiece(r,c);
     for(let sr=0;sr<2;sr++)for(let sc=0;sc<2;sc++){
@@ -47,50 +45,51 @@ function drawBoard(){
       });
       cell.appendChild(sub);
     }
-    b.appendChild(cell);
+    board.appendChild(cell);
   }
 }
 
-function selectPiece(p){ selectedPiece=p; drawBoard(); }
+function selectPiece(p){ selectedPiece=p; highlightMoves(); }
+
+function highlightMoves(){
+  document.querySelectorAll('.highlight').forEach(el=>el.classList.remove('highlight'));
+  let [r,c]=selectedPiece.pos;
+  [[0,-1],[-1,0],[1,0],[0,1]].forEach(([dr,dc])=>{
+    let nr=r+dr,nc=c+dc;
+    if(nr>=0&&nc>=0&&nr<3&&nc<3){
+      const cell=document.getElementById('board').children[nr*3+nc];
+      cell.classList.add('highlight');
+    }
+  });
+}
 
 function movePiece(r,c){
   if(!selectedPiece)return;
-  let [pr,pc]=selectedPiece.pos;
-  if(Math.abs(pr-r)>1||Math.abs(pc-c)>1)return;
+  const [pr,pc]=selectedPiece.pos;
+  if(Math.abs(pr-r)+Math.abs(pc-c)!==1)return;
   for(let sr=0;sr<2;sr++)for(let sc=0;sc<2;sc++){
     if(!pieces.some(pi=>pi.pos.join()===[r,c,sr,sc].join())){
-      selectedPiece.pos=[r,c,sr,sc];
-      checkWin();
-      turn=(turn+1)%4;
-      selectedPiece=null;
-      if(turn!==0)aiMove();
-      drawBoard();
+      selectedPiece.pos=[r,c,sr,sc]; selectedPiece=null;
+      if(checkWin(turn))setTimeout(()=>alert(`Player ${turn+1} wins!`),10);
+      turn=(turn+1)%4; if(turn!==0)aiMove(); drawBoard();
       return;
     }
   }
 }
 
 function aiMove(){
-  let aiPieces=pieces.filter(p=>p.p===turn);
+  const aiPieces=pieces.filter(p=>p.p===turn);
   aiPieces.some(ap=>{
-    let [tr,tc]=[[0,0],[0,2],[2,0],[2,2]][turn];
-    let [cr,cc]=ap.pos;
-    let dr=Math.sign(tr-cr),dc=Math.sign(tc-cc);
-    if(dr||dc){
-      movePiece(cr+dr,cc+dc);
-      return true;
-    }
+    const goal=[[0,0],[0,2],[2,0],[2,2]][turn];
+    const [cr,cc]=ap.pos;
+    const dr=Math.sign(goal[0]-cr),dc=Math.sign(goal[1]-cc);
+    if(dr||dc){ movePiece(cr+(dr||0),cc+(dc||0)); return true; }
   });
 }
 
-function checkWin(){
-  for(let i=0;i<4;i++){
-    let goal=[[0,0],[0,2],[2,0],[2,2]][i];
-    let playerPieces=pieces.filter(p=>p.p===i);
-    if(playerPieces.every(p=>p.pos[0]===goal[0]&&p.pos[1]===goal[1])){
-      setTimeout(()=>alert(`Player ${i+1} wins!`),10);
-    }
-  }
+function checkWin(player){
+  const goal=[[0,0],[0,2],[2,0],[2,2]][player];
+  return pieces.filter(p=>p.p===player).every(p=>p.pos[0]===goal[0]&&p.pos[1]===goal[1]);
 }
 
 drawBoard();
